@@ -1,0 +1,16 @@
+--- a/shell/hush.c	2016-02-11 14:50:37.000000000 +0300
++++ b/shell/hush.c
+@@ -6421,7 +6421,12 @@
+ 	/* Don't propagate SIG_IGN to the child */
+ 	if (SPECIAL_JOBSTOP_SIGS != 0)
+ 		switch_off_special_sigs(G.special_sig_mask & SPECIAL_JOBSTOP_SIGS);
+-	execvp(argv[0], argv);
++	/*
++	 * Go through BB_EXECVP so that "exec <applet>" resolves built-in
++	 * applets in a standalone shell that has no symlinks on disk
++	 * (the STM32F7 initramfs: a ramfs symlink costs a page each).
++	 */
++	BB_EXECVP(argv[0], argv);
+ 	bb_perror_msg("can't execute '%s'", argv[0]);
+ 	_exit(127); /* bash compat */
+ }

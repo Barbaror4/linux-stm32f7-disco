@@ -1,0 +1,20 @@
+#!/bin/sh
+#
+# System start-up. Runs both from the initramfs and from the SD card root.
+
+mountpoint_mounted() {
+	grep -q " $1 " /proc/mounts 2>/dev/null
+}
+
+mountpoint_mounted /proc || mount -t proc proc /proc
+mountpoint_mounted /sys  || mount -t sysfs sysfs /sys
+mountpoint_mounted /dev/pts || mount -t devpts devpts /dev/pts 2>/dev/null
+
+hostname -F /etc/hostname 2>/dev/null || hostname stm32f7-disco
+
+ifconfig lo 127.0.0.1 up 2>/dev/null
+ifconfig eth0 172.17.4.206 netmask 255.255.0.0 up &
+
+# /etc/fstab differs per root: the initramfs one exposes an installed SD
+# root under /mnt/sd, the SD one mounts the FAT data partition there.
+mount -a 2>/dev/null

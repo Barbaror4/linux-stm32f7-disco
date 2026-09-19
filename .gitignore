@@ -1,0 +1,39 @@
+# ---- outer workspace scratch / logs / backups ----
+*.log
+*.bak
+/initdir-backup-before-sd/
+/kernel-config-before-sdmmc.bak
+
+# ---- host-built tools & artifacts the kernel's own .gitignore misses ----
+*.exe
+*.cpio
+initramfs_data.*
+
+# ---- upstream BusyBox source + build products ----
+# Regenerate with: userspace/setup-busybox.sh  (downloads 1.24.2 + applies patches/)
+/userspace/busybox-1.24.2/
+/userspace/build-core/
+/userspace/build-ext/
+/userspace/busybox
+/userspace/bbx
+/userspace/busybox-core.config
+/userspace/busybox-ext.config
+/userspace/busybox-build.log
+
+# ---- compiled userspace helper binaries (rebuilt from userspace/tools/*.c) ----
+/userspace/tools/f7fetch
+/userspace/tools/uart_bridge
+/userspace/tools/fbtest_rgb565
+/userspace/tools/pinsample
+/userspace/tools/regsample
+/userspace/tools/ethtx
+/userspace/tools/*.gdb
+
+# ---- python cruft ----
+__pycache__/
+*.pyc
+
+# ---- kernel-tree artifacts the in-tree .gitignore doesn't cover ----
+/linux-stm32f7-master/initdir.tar
+/linux-stm32f7-master/vmlinux.o
+/userspace/busybox-1.24.2.tar.bz2

@@ -1,0 +1,61 @@
+--- a/scripts/basic/fixdep.c	2016-02-11 14:50:37.000000000 +0300
++++ b/scripts/basic/fixdep.c
+@@ -288,9 +288,14 @@
+ 
+ 	fd = open(filename, O_RDONLY);
+ 	if (fd < 0) {
+-		fprintf(stderr, "fixdep: ");
++		/*
++		 * A dependency we cannot open contributes no CONFIG_ symbols.
++		 * Warn rather than abort: the Windows-hosted cross compiler
++		 * emits header paths this host build cannot always reopen.
++		 */
++		fprintf(stderr, "fixdep: warning: ");
+ 		perror(filename);
+-		exit(2);
++		return;
+ 	}
+ 	fstat(fd, &st);
+ 	if (st.st_size == 0) {
+@@ -330,14 +335,27 @@
+ 	clear_config();
+ 
+ 	while (m < end) {
+-		while (m < end && (*m == ' ' || *m == '\\' || *m == '\n' || *m == '\r'))
++		/*
++		 * Separators are whitespace and backslashes acting as line
++		 * continuations. A backslash followed by anything else is a
++		 * Windows path separator and belongs to the token: splitting
++		 * on it broke absolute toolchain header paths into fragments,
++		 * and the old backwards scan for the final token ran off the
++		 * head of the mapping on CRLF-terminated dep files.
++		 */
++		while (m < end && (*m == ' ' || *m == '\t' ||
++		       *m == '\n' || *m == '\r' ||
++		       (*m == '\\' &&
++			(m + 1 >= end || m[1] == '\n' || m[1] == '\r'))))
+ 			m++;
++		if (m >= end)
++			break;
+ 		p = m;
+-		while (p < end && *p != ' ') p++;
+-		if (p == end) {
+-			do p--; while (!isalnum(*p));
++		while (p < end && !(*p == ' ' || *p == '\t' ||
++		       *p == '\n' || *p == '\r' ||
++		       (*p == '\\' &&
++			(p + 1 >= end || p[1] == '\n' || p[1] == '\r'))))
+ 			p++;
+-		}
+ 		memcpy(s, m, p-m); s[p-m] = 0;
+ 		if (strrcmp(s, "include/autoconf.h") &&
+ 		    strrcmp(s, "arch/um/include/uml-config.h") &&
+@@ -345,7 +363,7 @@
+ 			printf("  %s \\\n", s);
+ 			do_config_file(s);
+ 		}
+-		m = p + 1;
++		m = p;
+ 	}
+ 	printf("\n%s: $(deps_%s)\n\n", target, target);
+ 	printf("$(deps_%s):\n", target);

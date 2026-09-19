@@ -1,0 +1,17 @@
+--- a/util-linux/umount.c	2016-03-17 23:35:49.000000000 +0300
++++ b/util-linux/umount.c
+@@ -32,6 +32,14 @@
+ #include <sys/mount.h>
+ #include "libbb.h"
+ 
++/*
++ * The uClibc headers shipped with the 2010.09 ARM uClinux toolchain predate
++ * the lazy-umount flag, so fall back to the kernel's value for it.
++ */
++#ifndef MNT_DETACH
++# define MNT_DETACH 0x00000002
++#endif
++
+ #if defined(__dietlibc__)
+ // TODO: This does not belong here.
+ /* 16.12.2006, Sampo Kellomaki (sampo@iki.fi)

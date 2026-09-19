@@ -1,0 +1,102 @@
+#!/bin/sh
+#
+# sdinstall - put a persistent root filesystem on the SD card.
+#
+# Repartitions the card as:
+#   p1  ext2   root filesystem (a copy of the running initramfs system)
+#   p2  FAT32  data partition, readable from Windows/macOS/Linux
+# then copies the running system onto p1. On the next boot /init finds
+# /sbin/init there and switch_roots into it.
+#
+# Usage: sdinstall [-y] [root-size-MB]     (default root size: 512 MB)
+
+DEV=/dev/mmcblk0
+ROOT=${DEV}p1
+DATA=${DEV}p2
+ROOT_MB=512
+YES=0
+
+for a in "$@"; do
+	case "$a" in
+	-y) YES=1 ;;
+	[0-9]*) ROOT_MB=$a ;;
+	*) echo "usage: sdinstall [-y] [root-size-MB]"; exit 1 ;;
+	esac
+done
+
+die() {
+	echo "sdinstall: $*" >&2
+	exit 1
+}
+
+[ -b "$DEV" ] || die "$DEV is not a block device (is the card inserted?)"
+grep -q "^/dev/mmcblk" /proc/mounts && \
+	die "the SD card is mounted; run this from the initramfs (boot with sdroot=off)"
+
+size_kb=$(sed -n "s/^ *179 *0 *\([0-9]*\) mmcblk0$/\1/p" /proc/partitions)
+[ -n "$size_kb" ] || die "cannot read the size of $DEV"
+size_mb=$((size_kb / 1024))
+[ "$ROOT_MB" -lt "$size_mb" ] || die "root size ${ROOT_MB}M exceeds the ${size_mb}M card"
+
+echo "SD card $DEV: ${size_mb} MB"
+echo "  $ROOT  ext2   ${ROOT_MB} MB   root filesystem"
+echo "  $DATA  FAT32  $((size_mb - ROOT_MB)) MB   data"
+echo
+if [ "$YES" != 1 ]; then
+	printf "ALL DATA ON THE CARD WILL BE ERASED. Type YES to continue: "
+	read answer
+	[ "$answer" = "YES" ] || die "aborted"
+fi
+
+echo ">> partitioning"
+# fdisk dialogue: new DOS label, p1 = +ROOT_MB Linux, p2 = rest, FAT32 LBA
+printf 'o\nn\np\n1\n\n+%sM\nn\np\n2\n\n\nt\n2\nc\nw\n' "$ROOT_MB" | bbx fdisk "$DEV" >/dev/null || \
+	die "fdisk failed"
+sync
+sleep 1
+[ -b "$ROOT" ] || die "$ROOT did not appear after partitioning"
+
+echo ">> formatting $ROOT (ext2)"
+bbx mkfs.ext2 -L f7root "$ROOT" >/dev/null || die "mkfs.ext2 failed"
+echo ">> formatting $DATA (FAT32)"
+bbx mkfs.vfat -n F7DATA "$DATA" >/dev/null || die "mkfs.vfat failed"
+
+echo ">> copying system"
+mount -t ext2 "$ROOT" /mnt/root || die "cannot mount $ROOT"
+
+for d in bin sbin etc lib usr; do
+	[ -d /$d ] || continue
+	cp -a /$d /mnt/root/ || die "copy of /$d failed"
+done
+cp -a /init /mnt/root/init
+
+for d in dev dev/pts dev/input proc sys mnt mnt/root mnt/sd tmp var var/log; do
+	mkdir -p /mnt/root/$d
+done
+# Device nodes: copy whatever the initramfs has, then make sure the ones the
+# SD boot needs are present even if the running system lacks them.
+cp -a /dev/* /mnt/root/dev/ 2>/dev/null
+mknod -m 660 /mnt/root/dev/mmcblk0 b 179 0 2>/dev/null
+for n in 1 2 3 4; do
+	mknod -m 660 /mnt/root/dev/mmcblk0p$n b 179 $n 2>/dev/null
+done
+mknod -m 666 /mnt/root/dev/ptmx c 5 2 2>/dev/null
+
+# Symlinks are cheap on ext2 (unlike ramfs), so give every applet of both
+# binaries a real name on the SD root.
+/bin/busybox --install -s /mnt/root/bin
+/bin/bbx --install -s /mnt/root/bin
+ln -sf ../bin/busybox /mnt/root/sbin/init
+ln -sf ../bin/busybox /mnt/root/sbin/reboot
+ln -sf ../bin/busybox /mnt/root/sbin/halt
+ln -sf ../bin/busybox /mnt/root/sbin/poweroff
+
+# The SD root mounts the data partition instead of itself.
+cat > /mnt/root/etc/fstab <<EOF
+# <device>        <mount>   <type>  <options>          <dump> <pass>
+/dev/mmcblk0p2    /mnt/sd   vfat    noatime            0      0
+EOF
+
+sync
+umount /mnt/root
+echo ">> done. Reboot to start from the SD card."

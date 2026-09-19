@@ -1,0 +1,22 @@
+# Login shell environment (sourced by hush when started as -sh).
+export PATH=/sbin:/bin:/usr/sbin:/usr/bin
+export TERM=linux
+export USER=root
+export HOME=/
+export PS1='\[\033[1;32m\]\h\[\033[0m\]:\w# '
+
+# The core /bin/busybox runs its own applets without symlinks (standalone
+# hush). The extended applets live in /bin/bbx; on the initramfs a symlink
+# costs a 4 KB ramfs page each, so expose them as shell functions instead.
+if [ ! -e /bin/vi ] && [ -x /bin/bbx ]; then
+	for a in $(/bin/bbx --list); do
+		eval "$a() { /bin/bbx $a \"\$@\"; }"
+	done
+fi
+
+# One-line orientation on every new terminal: where the root lives.
+if grep -q "^/dev/mmcblk" /proc/mounts 2>/dev/null; then
+	echo "rootfs: SD card (persistent)  |  type f7fetch for system info"
+else
+	echo "rootfs: initramfs (volatile)  |  sdinstall puts one on the SD card"
+fi

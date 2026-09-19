@@ -1,0 +1,4 @@
+# Preserve exact bytes on checkout/commit. This tree is built by a
+# Windows-hosted cross toolchain and contains line-ending-sensitive files
+# (e.g. scripts/basic/fixdep.c parsing); never auto-convert EOLs.
+* -text

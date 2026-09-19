@@ -1,0 +1,50 @@
+#!/bin/sh
+#
+# initramfs /init for the STM32F7-DISCO uClinux port.
+#
+# Hand over to a persistent root filesystem on the SD card if one is present. Otherwise keep running from the
+# initramfs, which doubles as the recovery / installer environment.
+#
+# Kernel command line knobs:
+#   sdroot=off   never try the SD card, stay on the initramfs
+#   sdroot=/dev/mmcblk0pN   use another partition (default /dev/mmcblk0p1)
+
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+
+SDROOT=/dev/mmcblk0p1
+for arg in $(cat /proc/cmdline); do
+	case "$arg" in
+	sdroot=*) SDROOT="${arg#sdroot=}" ;;
+	esac
+done
+
+if [ "$SDROOT" != "off" ]; then
+	# The MMC core probes the card asynchronously; give it a moment.
+	n=0
+	while [ $n -lt 5 ]; do
+		if mount -t ext2 -o noatime "$SDROOT" /mnt/root 2>/dev/null; then
+			break
+		fi
+		n=$((n + 1))
+		sleep 1
+	done
+
+	# switch_root insists on running as PID 1 on a real mount point, so it
+	# has to be exec'd from here; check its preconditions first because a
+	# failed exec of PID 1 is a kernel panic.
+	if [ -x /mnt/root/sbin/init ] && [ -x /mnt/root/bin/busybox ] &&
+	   [ "$(stat -c %d /mnt/root)" != "$(stat -c %d /)" ]; then
+		echo "init: switching root to $SDROOT"
+		umount /sys
+		umount /proc
+		exec /bin/busybox switch_root /mnt/root /sbin/init
+	fi
+
+	# Mounted but not a bootable root (fresh card, wrong contents, ...).
+	umount /mnt/root 2>/dev/null
+	echo "init: no root filesystem on $SDROOT, staying on initramfs"
+	echo "init: run 'sdinstall' to put one there"
+fi
+
+exec /sbin/init

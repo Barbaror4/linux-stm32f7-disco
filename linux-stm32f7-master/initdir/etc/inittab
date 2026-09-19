@@ -1,0 +1,5 @@
+::sysinit:/etc/init.d/rcS
+tty1::respawn:-/bin/sh
+ttyS5::respawn:/bin/uart_bridge
+::restart:/sbin/init
+::ctrlaltdel:/sbin/reboot

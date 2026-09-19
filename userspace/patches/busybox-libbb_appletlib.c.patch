@@ -1,0 +1,16 @@
+--- a/libbb/appletlib.c	2016-03-17 23:35:49.000000000 +0300
++++ b/libbb/appletlib.c
+@@ -779,7 +779,12 @@
+ 	int applet = find_applet_by_name(name);
+ 	if (applet >= 0)
+ 		run_applet_no_and_exit(applet, argv);
+-	if (is_prefixed_with(name, "busybox"))
++	/*
++	 * "bbx" is the name the STM32F7 rootfs installs the extended
++	 * applet set under; treat it like "busybox" so that "bbx vi file"
++	 * works without a symlink per applet.
++	 */
++	if (is_prefixed_with(name, "busybox") || strcmp(name, "bbx") == 0)
+ 		exit(busybox_main(argv));
+ }
+ 
