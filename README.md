@@ -23,6 +23,7 @@ a microSD card.
 - [Hardware](#hardware)
 - [Repository layout](#repository-layout)
 - [Building](#building)
+- [Bootloader (U-Boot)](#bootloader-u-boot)
 - [Booting the board](#booting-the-board)
 - [Using it](#using-it)
 - [Limitations & catches](#limitations--catches)
@@ -128,6 +129,24 @@ cd ..
 ```
 
 `.config` is committed, so `oldconfig` reproduces the exact configuration.
+
+## Bootloader (U-Boot)
+
+This port boots via **Emcraft's U-Boot for the STM32F7 Discovery**
+(`U-Boot 2010.03-cortexm-1.14.2`) — the same bootloader whose `run netboot`
+command loads the kernel below. It is **not** part of this repository; get it
+and flash it from Emcraft:
+
+- **Download** (`u-boot.bin`, under *Software*):
+  <https://emcraft.com/products/503#software>
+- **Install guide:**
+  <https://emcraft.com/stm32f7-discovery-board/installing-uboot-to-stm32f7-discovery-board>
+
+In short: with the ST-LINK **ST-LINK Utility**, program `u-boot.bin` to the
+internal flash at **`0x08000000`** over the ST-LINK USB (CN14). This overwrites
+any existing firmware and makes U-Boot the primary bootloader. After that you
+get the `STM32F746-DISCO>` prompt on the serial console and can netboot the
+kernel as below.
 
 ## Booting the board
 
